@@ -2,6 +2,7 @@ import streamlit as st
 import tensorflow as tf
 import numpy as np
 from PIL import Image
+import matplotlib.pyplot as plt
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 CLASS_NAMES = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
@@ -57,170 +58,56 @@ CLASS_CONFIG = {
     }
 }
 
-# ── PAGE SETUP ────────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="EcoScan AI",
-    page_icon="♻️",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
+CLASS_COLORS = {
+    'cardboard': '#e8a87c', 'glass': '#7ecdc8', 'metal': '#a8b8c8',
+    'paper': '#98c89a', 'plastic': '#b8a8d8', 'trash': '#e87c7c'
+}
 
-# ── GLOBAL STYLES ─────────────────────────────────────────────────────────────
+# ── PAGE SETUP ────────────────────────────────────────────────────────────────
+st.set_page_config(page_title="EcoScan AI", page_icon="♻️", layout="centered", initial_sidebar_state="collapsed")
+
+# ── SESSION STATE ─────────────────────────────────────────────────────────────
+if 'history' not in st.session_state:
+    st.session_state.history = []
+
+# ── STYLES ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
-
-html, body, [class*="css"] {
-    font-family: 'Space Grotesk', sans-serif !important;
-    background-color: #0a0f0a !important;
-    color: #e8f5e8 !important;
-}
-
-.stApp { background-color: #0a0f0a; }
-
-/* Hide Streamlit branding */
-#MainMenu, footer, header { visibility: hidden; }
-
-/* Header */
-.eco-header {
-    text-align: center;
-    padding: 2rem 0 1rem;
-    animation: fadeInDown 0.6s ease;
-}
-.eco-logo {
-    font-size: 3.5rem;
-    display: block;
-    animation: pulse 2s infinite;
-}
-.eco-title {
-    font-size: 2.8rem;
-    font-weight: 700;
-    background: linear-gradient(135deg, #4ade80, #22d3ee);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin: 0.3rem 0;
-    letter-spacing: -1px;
-}
-.eco-subtitle {
-    color: #6b8f6b;
-    font-size: 0.85rem;
-    font-weight: 400;
-    letter-spacing: 0.5px;
-}
-
-/* Upload section */
-.upload-zone {
-    background: #0f1a0f;
-    border: 2px dashed #2d4a2d;
-    border-radius: 16px;
-    padding: 1.5rem;
-    margin: 1.5rem 0;
-    transition: border-color 0.3s;
-}
-
-/* Result card */
-.result-card {
-    border-radius: 20px;
-    padding: 2rem;
-    text-align: center;
-    margin: 1.5rem 0;
-    animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.result-emoji { font-size: 4rem; display: block; margin-bottom: 0.5rem; }
-.result-class {
-    font-size: 2.2rem;
-    font-weight: 700;
-    margin: 0.2rem 0;
-}
-.result-bin { font-size: 0.95rem; opacity: 0.85; margin-bottom: 1rem; }
-.badge {
-    display: inline-block;
-    padding: 0.3rem 1rem;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: 600;
-}
-.badge-recyclable { background: #1a3a1a; color: #4ade80; border: 1px solid #4ade80; }
-.badge-trash { background: #3a1a1a; color: #f87171; border: 1px solid #f87171; }
-
-/* Info boxes */
-.info-box {
-    border-radius: 14px;
-    padding: 1.2rem 1.4rem;
-    margin: 1rem 0;
-}
-.tip-box { background: #0f1e12; border-left: 4px solid #4ade80; }
-.tip-title { color: #4ade80; font-size: 0.75rem; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 0.5rem; }
-.do-box { background: #0f1e12; border-radius: 14px; padding: 1.2rem 1.4rem; margin: 0.5rem 0; }
-.dont-box { background: #1e0f0f; border-radius: 14px; padding: 1.2rem 1.4rem; margin: 0.5rem 0; }
-.do-title { color: #4ade80; font-weight: 700; margin-bottom: 0.6rem; }
-.dont-title { color: #f87171; font-weight: 700; margin-bottom: 0.6rem; }
-.fact-box { background: #0d1520; border-radius: 14px; padding: 1.2rem 1.4rem; margin: 1rem 0; }
-.fact-title { color: #38bdf8; font-size: 0.75rem; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 0.6rem; }
-.fact-item { color: #94b8d4; margin: 0.4rem 0; font-size: 0.9rem; }
-
-/* Warning */
-.warn-box {
-    background: #1e1600;
-    border: 1px solid #ca8a04;
-    border-radius: 12px;
-    padding: 1rem 1.2rem;
-    color: #fbbf24;
-    margin: 1rem 0;
-    font-size: 0.9rem;
-}
-
-/* Section headers */
-.section-label {
-    color: #6b8f6b;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin: 1.5rem 0 0.8rem;
-}
-
-/* Footer */
-.eco-footer {
-    text-align: center;
-    color: #2d4a2d;
-    font-size: 0.78rem;
-    padding: 2rem 0 1rem;
-    line-height: 1.8;
-}
-
-/* Streamlit button override */
-.stButton > button {
-    background: linear-gradient(135deg, #4ade80, #22d3ee) !important;
-    color: #0a0f0a !important;
-    border: none !important;
-    border-radius: 12px !important;
-    font-weight: 700 !important;
-    font-family: 'Space Grotesk', sans-serif !important;
-    padding: 0.6rem 2rem !important;
-    font-size: 1rem !important;
-    transition: opacity 0.2s !important;
-}
-.stButton > button:hover { opacity: 0.85 !important; }
-
-/* Progress bar colors */
-.stProgress > div > div > div > div {
-    background: linear-gradient(90deg, #4ade80, #22d3ee) !important;
-}
-
-@keyframes fadeInDown {
-    from { opacity: 0; transform: translateY(-20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-@keyframes slideUp {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-@keyframes pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.08); }
-}
+html,body,[class*="css"]{font-family:'Space Grotesk',sans-serif!important;background-color:#0a0f0a!important;color:#e8f5e8!important}
+.stApp{background-color:#0a0f0a}
+#MainMenu,footer,header{visibility:hidden}
+.eco-header{text-align:center;padding:2rem 0 1rem;animation:fadeInDown 0.6s ease}
+.eco-logo{font-size:3.5rem;display:block;animation:pulse 2s infinite}
+.eco-title{font-size:2.8rem;font-weight:700;background:linear-gradient(135deg,#4ade80,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-1px}
+.eco-subtitle{color:#6b8f6b;font-size:0.85rem;letter-spacing:0.5px}
+.result-card{border-radius:20px;padding:2rem;text-align:center;margin:1.5rem 0;animation:slideUp 0.5s cubic-bezier(0.34,1.56,0.64,1)}
+.result-emoji{font-size:4rem;display:block;margin-bottom:0.5rem}
+.result-class{font-size:2.2rem;font-weight:700;margin:0.2rem 0}
+.result-bin{font-size:0.95rem;opacity:0.85;margin-bottom:1rem}
+.badge{display:inline-block;padding:0.3rem 1rem;border-radius:20px;font-size:0.85rem;font-weight:600}
+.badge-recyclable{background:#1a3a1a;color:#4ade80;border:1px solid #4ade80}
+.badge-trash{background:#3a1a1a;color:#f87171;border:1px solid #f87171}
+.tip-box{background:#0f1e12;border-left:4px solid #4ade80;border-radius:0 14px 14px 0;padding:1.2rem 1.4rem;margin:1rem 0}
+.tip-title{color:#4ade80;font-size:0.75rem;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:0.5rem}
+.do-box{background:#0f1e12;border-radius:14px;padding:1.2rem 1.4rem;margin:0.5rem 0}
+.dont-box{background:#1e0f0f;border-radius:14px;padding:1.2rem 1.4rem;margin:0.5rem 0}
+.do-title{color:#4ade80;font-weight:700;margin-bottom:0.6rem}
+.dont-title{color:#f87171;font-weight:700;margin-bottom:0.6rem}
+.fact-box{background:#0d1520;border-radius:14px;padding:1.2rem 1.4rem;margin:1rem 0}
+.fact-title{color:#38bdf8;font-size:0.75rem;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:0.6rem}
+.warn-box{background:#1e1600;border:1px solid #ca8a04;border-radius:12px;padding:1rem 1.2rem;color:#fbbf24;margin:1rem 0;font-size:0.9rem}
+.section-label{color:#6b8f6b;font-size:0.75rem;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin:1.5rem 0 0.8rem}
+.stat-row{display:flex;gap:1rem;margin:1rem 0}
+.stat-card{flex:1;background:#0f1a0f;border:1px solid #1a3a1a;border-radius:14px;padding:1rem;text-align:center}
+.stat-num{font-size:1.8rem;font-weight:700;color:#4ade80}
+.stat-label{font-size:0.75rem;color:#6b8f6b;margin-top:0.2rem}
+.eco-footer{text-align:center;color:#2d4a2d;font-size:0.78rem;padding:2rem 0 1rem;line-height:1.8}
+.stButton>button{background:linear-gradient(135deg,#4ade80,#22d3ee)!important;color:#0a0f0a!important;border:none!important;border-radius:12px!important;font-weight:700!important;font-family:'Space Grotesk',sans-serif!important;padding:0.6rem 2rem!important;font-size:1rem!important}
+.stProgress>div>div>div>div{background:linear-gradient(90deg,#4ade80,#22d3ee)!important}
+@keyframes fadeInDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -236,37 +123,36 @@ st.markdown("""
 # ── MODEL LOADING ─────────────────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
 def load_model():
-    try:
-        model = tf.keras.models.load_model("waste_model_v2.keras", compile=False)
-        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        return model
-    except Exception as e:
-        st.error(f"Load error: {e}")
-        return None
+    paths = [
+        "waste_model_v2.keras",
+        "waste_model_v2.h5",
+        "/content/drive/MyDrive/DL_Waste_Project/models/waste_model_v2.keras",
+        "/content/drive/MyDrive/DL_Waste_Project/models/waste_model_v2.h5",
+    ]
+    for path in paths:
+        try:
+            m = tf.keras.models.load_model(path, compile=False)
+            m.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+            return m
+        except Exception:
+            continue
+    return None
 
 with st.spinner("Loading model..."):
     model = load_model()
 
 if model is None:
     st.markdown("""
-    <div style="background:#1e0f0f;border:1px solid #f87171;border-radius:12px;padding:1.2rem;color:#f87171;">
-        ✗ Model not found. Check the path in <code>load_model()</code> and try again.
-    </div>
-    <div class="info-box tip-box" style="margin-top:0.5rem;color:#94b8d4;">
-        Expected: <code>waste_model_v2.keras</code> in the same folder as this app.
+    <div style="background:#1e0f0f;border:1px solid #f87171;border-radius:12px;padding:1.2rem;color:#f87171;margin:1rem 0;">
+        ✗ <strong>Model not found.</strong> Ensure <code>waste_model_v2.keras</code> is in the repo root.
     </div>
     """, unsafe_allow_html=True)
     st.stop()
 
 # ── IMAGE INPUT ───────────────────────────────────────────────────────────────
 tab1, tab2 = st.tabs(["📁 Upload Image", "📷 Camera"])
-
-uploaded_file = None
-camera_image = None
-
 with tab1:
-    uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
-
+    uploaded_file = st.file_uploader("", type=["jpg","jpeg","png"], label_visibility="collapsed")
 with tab2:
     camera_image = st.camera_input("")
 
@@ -278,49 +164,37 @@ if image_source:
 
     if st.button("🔍 Analyse Waste", use_container_width=True):
 
-        # Preprocess
-        img_resized = image.resize((224, 224))
-        img_array = np.array(img_resized) / 255.0
-        img_array = np.expand_dims(img_array, axis=0)
+        img_array = np.expand_dims(np.array(image.resize((224, 224))) / 255.0, axis=0)
 
         with st.spinner("Classifying..."):
             predictions = model.predict(img_array, verbose=0)[0]
 
-        predicted_idx = int(np.argmax(predictions))
+        predicted_idx   = int(np.argmax(predictions))
         predicted_class = CLASS_NAMES[predicted_idx]
-        confidence = float(predictions[predicted_idx])
-        cfg = CLASS_CONFIG[predicted_class]
+        confidence      = float(predictions[predicted_idx])
+        cfg             = CLASS_CONFIG[predicted_class]
+
+        # Record in session history
+        st.session_state.history.append({'class': predicted_class, 'confidence': confidence})
 
         # Low confidence warning
         if confidence < 0.55:
-            st.markdown(f"""
-            <div class="warn-box">
-                ⚠️ <strong>Low Confidence</strong> — The model is unsure about this image.
-                Try a clearer, better-lit photo of a single item.
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown('<div class="warn-box">⚠️ <strong>Low Confidence</strong> — Try a clearer, better-lit photo of a single item.</div>', unsafe_allow_html=True)
 
-        # ── RESULT CARD ───────────────────────────────────────────────────────
-        badge_class = "badge-recyclable" if cfg['recyclable'] else "badge-trash"
+        # Result card
+        badge_cls  = "badge-recyclable" if cfg['recyclable'] else "badge-trash"
         badge_text = "✓ Recyclable" if cfg['recyclable'] else "✗ Not Recyclable"
-
         st.markdown(f"""
-        <div class="result-card" style="background: linear-gradient(135deg, #0f1a0f, #0d1520); border: 1px solid {cfg['color']}33;">
+        <div class="result-card" style="background:linear-gradient(135deg,#0f1a0f,#0d1520);border:1px solid {cfg['color']}33;">
             <span class="result-emoji">{cfg['emoji']}</span>
             <div class="result-class" style="color:{cfg['color']};">{predicted_class.capitalize()}</div>
             <div class="result-bin">🗂️ {cfg['bin']}</div>
-            <span class="badge {badge_class}">{badge_text}</span>
+            <span class="badge {badge_cls}">{badge_text}</span>
         </div>
         """, unsafe_allow_html=True)
 
-        # ── CONFIDENCE BAR ────────────────────────────────────────────────────
-        if confidence >= 0.75:
-            conf_label = "High Confidence"
-        elif confidence >= 0.55:
-            conf_label = "Medium Confidence"
-        else:
-            conf_label = "Low Confidence"
-
+        # Confidence bar
+        conf_label = "High Confidence" if confidence >= 0.75 else ("Medium Confidence" if confidence >= 0.55 else "Low Confidence")
         col_l, col_r = st.columns([3, 1])
         with col_l:
             st.caption(f"Confidence — {conf_label}")
@@ -328,65 +202,115 @@ if image_source:
             st.caption(f"**{confidence*100:.1f}%**")
         st.progress(float(confidence))
 
-        # ── ALL CLASSES BREAKDOWN ─────────────────────────────────────────────
+        # All classes breakdown
         st.markdown('<div class="section-label">All Classes</div>', unsafe_allow_html=True)
-
-        sorted_preds = sorted(
-            zip(CLASS_NAMES, predictions),
-            key=lambda x: x[1],
-            reverse=True
-        )
-
-        for cls, prob in sorted_preds:
-            c_cfg = CLASS_CONFIG[cls]
-            col1, col2, col3 = st.columns([2, 6, 1])
-            with col1:
-                is_top = cls == predicted_class
+        for cls, prob in sorted(zip(CLASS_NAMES, predictions), key=lambda x: x[1], reverse=True):
+            is_top = cls == predicted_class
+            c1, c2, c3 = st.columns([2, 6, 1])
+            with c1:
                 st.markdown(
-                    f"<span style='color:{'#4ade80' if is_top else '#6b8f6b'};font-weight:{'700' if is_top else '400'};'>"
-                    f"{c_cfg['emoji']} {cls}</span>",
+                    f"<span style='color:{'#4ade80' if is_top else '#6b8f6b'};font-weight:{'700' if is_top else '400'};font-size:0.85rem;'>"
+                    f"{CLASS_CONFIG[cls]['emoji']} {cls}</span>",
                     unsafe_allow_html=True
                 )
-            with col2:
+            with c2:
                 st.progress(float(prob))
-            with col3:
+            with c3:
                 st.caption(f"{prob*100:.1f}%")
 
-        # ── DISPOSAL TIP ──────────────────────────────────────────────────────
+        # Disposal tip
         st.markdown(f"""
-        <div class="info-box tip-box">
+        <div class="tip-box">
             <div class="tip-title">💡 Disposal Tip</div>
             <div style="color:#c8e6c8;">{cfg['tip']}</div>
         </div>
         """, unsafe_allow_html=True)
 
-        # ── DO / DON'T ────────────────────────────────────────────────────────
+        # Do / Don't
         col_do, col_dont = st.columns(2)
         with col_do:
-            do_items = "".join([f"<div style='color:#c8e6c8;margin:0.3rem 0;font-size:0.88rem;'>✓ {item}</div>" for item in cfg['do']])
-            st.markdown(f"""
-            <div class="do-box">
-                <div class="do-title">✓ DO</div>
-                {do_items}
-            </div>
-            """, unsafe_allow_html=True)
+            items = "".join([f"<div style='color:#c8e6c8;margin:0.3rem 0;font-size:0.88rem;'>✓ {i}</div>" for i in cfg['do']])
+            st.markdown(f'<div class="do-box"><div class="do-title">✓ DO</div>{items}</div>', unsafe_allow_html=True)
         with col_dont:
-            dont_items = "".join([f"<div style='color:#f4c4c4;margin:0.3rem 0;font-size:0.88rem;'>{item}</div>" for item in cfg['dont']])
-            st.markdown(f"""
-            <div class="dont-box">
-                <div class="dont-title">✗ DON'T</div>
-                {dont_items}
-            </div>
-            """, unsafe_allow_html=True)
+            items = "".join([f"<div style='color:#f4c4c4;margin:0.3rem 0;font-size:0.88rem;'>{i}</div>" for i in cfg['dont']])
+            st.markdown(f'<div class="dont-box"><div class="dont-title">✗ DON\'T</div>{items}</div>', unsafe_allow_html=True)
 
-        # ── DID YOU KNOW ──────────────────────────────────────────────────────
-        fact_items = "".join([f"<div class='fact-item'>• {f}</div>" for f in cfg['facts']])
-        st.markdown(f"""
-        <div class="fact-box">
-            <div class="fact-title">🌍 Did You Know?</div>
-            {fact_items}
-        </div>
-        """, unsafe_allow_html=True)
+        # Did you know
+        facts = "".join([f"<div style='color:#94b8d4;margin:0.4rem 0;font-size:0.9rem;'>• {f}</div>" for f in cfg['facts']])
+        st.markdown(f'<div class="fact-box"><div class="fact-title">🌍 Did You Know?</div>{facts}</div>', unsafe_allow_html=True)
+
+# ── SESSION STATISTICS ────────────────────────────────────────────────────────
+if st.session_state.history:
+    st.markdown("---")
+    st.markdown('<div class="section-label">📊 Session Statistics</div>', unsafe_allow_html=True)
+
+    history      = st.session_state.history
+    total_scans  = len(history)
+    avg_conf     = np.mean([h['confidence'] for h in history]) * 100
+    recyclable_n = sum(1 for h in history if CLASS_CONFIG[h['class']]['recyclable'])
+
+    # Stat cards
+    st.markdown(f"""
+    <div class="stat-row">
+        <div class="stat-card"><div class="stat-num">{total_scans}</div><div class="stat-label">Items Scanned</div></div>
+        <div class="stat-card"><div class="stat-num">{avg_conf:.1f}%</div><div class="stat-label">Avg Confidence</div></div>
+        <div class="stat-card"><div class="stat-num">{recyclable_n}</div><div class="stat-label">Recyclable</div></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Count per class
+    class_counts = {c: 0 for c in CLASS_NAMES}
+    for h in history:
+        class_counts[h['class']] += 1
+    active = {k: v for k, v in class_counts.items() if v > 0}
+
+    # Pie chart
+    st.markdown('<div class="section-label">Items Classified by Type</div>', unsafe_allow_html=True)
+    fig, ax = plt.subplots(figsize=(5, 4), facecolor='#0a0f0a')
+    ax.set_facecolor('#0a0f0a')
+    wedges, texts, autotexts = ax.pie(
+        list(active.values()),
+        labels=[f"{CLASS_CONFIG[c]['emoji']} {c}" for c in active],
+        colors=[CLASS_COLORS[c] for c in active],
+        autopct=lambda p: f'{p:.1f}%' if p > 0 else '',
+        startangle=140,
+        pctdistance=0.75,
+        wedgeprops=dict(linewidth=2, edgecolor='#0a0f0a')
+    )
+    for t in texts:
+        t.set_color('#c8e6c8')
+        t.set_fontsize(9)
+    for a in autotexts:
+        a.set_color('#0a0f0a')
+        a.set_fontweight('bold')
+        a.set_fontsize(9)
+    plt.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close()
+
+    # Avg confidence per class
+    st.markdown('<div class="section-label">Avg Confidence per Waste Type</div>', unsafe_allow_html=True)
+    class_conf = {}
+    for h in history:
+        class_conf.setdefault(h['class'], []).append(h['confidence'])
+
+    for cls, confs in sorted(class_conf.items(), key=lambda x: -np.mean(x[1])):
+        avg = np.mean(confs) * 100
+        c1, c2, c3 = st.columns([2, 5, 1])
+        with c1:
+            st.markdown(
+                f"<span style='color:{CLASS_CONFIG[cls]['color']};font-size:0.85rem;font-weight:600;'>"
+                f"{CLASS_CONFIG[cls]['emoji']} {cls}</span>",
+                unsafe_allow_html=True
+            )
+        with c2:
+            st.progress(float(avg / 100))
+        with c3:
+            st.caption(f"{avg:.1f}%")
+
+    if st.button("🗑️ Clear Session History", use_container_width=True):
+        st.session_state.history = []
+        st.rerun()
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown("""
