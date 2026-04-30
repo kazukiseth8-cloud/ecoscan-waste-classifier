@@ -444,16 +444,15 @@ def load_model():
     # On Colab: /content/drive/MyDrive/DL_Waste_Project/models/waste_model_v2.h5
     # Locally:  waste_model_v2.h5 (same folder as app_mobile.py)
     try:
-        model = tf.keras.models.load_model("waste_model_v2.h5")
+        model = tf.keras.models.load_model(
+            "waste_model_v2.h5",
+            compile=False
+        )
+        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         return model
-    except Exception:
-        try:
-            model = tf.keras.models.load_model(
-                "/content/drive/MyDrive/DL_Waste_Project/models/waste_model_v2.h5"
-            )
-            return model
-        except Exception as e:
-            return None
+    except Exception as e:
+        st.error(f"Load error: {e}")
+        return None
 
 # ── PREDICTION ────────────────────────────────────────────────────────────────
 def predict(image: Image.Image, model) -> tuple:
