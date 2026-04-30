@@ -444,10 +444,7 @@ def load_model():
     # On Colab: /content/drive/MyDrive/DL_Waste_Project/models/waste_model_v2.h5
     # Locally:  waste_model_v2.h5 (same folder as app_mobile.py)
     try:
-        model = tf.keras.models.load_model(
-            "waste_model_v2.h5",
-            compile=False
-        )
+        model = tf.keras.models.load_model("waste_model_v2.keras", compile=False)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         return model
     except Exception as e:
